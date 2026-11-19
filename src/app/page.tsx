@@ -1,69 +1,194 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+} from "recharts";
+
+interface Sensor {
+    id: string;
+    temperature: number;
+    humidity: number;
+    brightness: number;
+    recorded_at: string;
+}
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    const [latest, setLatest] = useState<Sensor | null>(null);
+    const [history, setHistory] = useState<Sensor[]>([]);
+    const [status, setStatus] = useState("Connecting...");
+
+    async function fetchSensors() {
+        try {
+            const [latestRes, historyRes] = await Promise.all([
+                fetch("/api/sensors/latest", { cache: "no-store" }),
+                fetch("/api/sensors?limit=20", { cache: "no-store" }),
+            ]);
+
+            if (!latestRes.ok || !historyRes.ok) {
+                throw new Error("API unavailable");
+            }
+
+            const latestData = await latestRes.json();
+            const historyData = await historyRes.json();
+
+            setLatest(latestData);
+            setHistory(historyData.data ?? []);
+            setStatus("Connected");
+        } catch {
+            setStatus("Disconnected");
+        }
+    }
+
+    useEffect(() => {
+        fetchSensors();
+
+        const interval = setInterval(fetchSensors, 5000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    const cards = [
+        {
+            title: "Temperature",
+            value: latest?.temperature ?? "--",
+            unit: "°C",
+        },
+        {
+            title: "Humidity",
+            value: latest?.humidity ?? "--",
+            unit: "%",
+        },
+        {
+            title: "Brightness",
+            value: latest?.brightness ?? "--",
+            unit: "ADC",
+        },
+    ];
+
+    const chartData = [...history].reverse().map((item) => ({
+        time: new Date(item.recorded_at).toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+        }),
+        temperature: item.temperature,
+        humidity: item.humidity,
+    }));
+
+    return (
+        <main className="min-h-screen bg-slate-950 text-white p-6 md:p-10">
+            <div className="max-w-6xl mx-auto">
+
+                <header className="flex justify-between items-center mb-10">
+                    <div>
+                        <h1 className="text-3xl font-bold">
+                            Smart Home
+                        </h1>
+                        <p className="text-slate-400 mt-1">
+                            IoT Monitoring Dashboard
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span
+                            className={`w-3 h-3 rounded-full ${
+                                status === "Connected"
+                                    ? "bg-green-400"
+                                    : "bg-red-500"
+                            }`}
+                        />
+                        <span className="text-sm text-slate-300">
+                            {status}
+                        </span>
+                    </div>
+                </header>
+
+                <section>
+                    <h2 className="text-xl font-semibold mb-4">
+                        Room Overview
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        {cards.map((card) => (
+                            <div
+                                key={card.title}
+                                className="bg-slate-900 border border-slate-800 rounded-2xl p-6"
+                            >
+                                <p className="text-slate-400">
+                                    {card.title}
+                                </p>
+
+                                <div className="flex items-baseline gap-2 mt-4">
+                                    <span className="text-4xl font-bold">
+                                        {card.value}
+                                    </span>
+
+                                    <span className="text-slate-400">
+                                        {card.unit}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                <section className="mt-10">
+                    <h2 className="text-xl font-semibold mb-4">
+                        Sensor History
+                    </h2>
+
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                        <h3 className="mb-6 text-slate-300">
+                            Temperature History
+                        </h3>
+
+                        <div className="h-72">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData}>
+                                    <CartesianGrid
+                                        strokeDasharray="3 3"
+                                        stroke="#334155"
+                                    />
+
+                                    <XAxis
+                                        dataKey="time"
+                                        stroke="#94a3b8"
+                                    />
+
+                                    <YAxis stroke="#94a3b8" />
+
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: "#0f172a",
+                                            border: "1px solid #334155",
+                                            borderRadius: "10px",
+                                        }}
+                                    />
+
+                                    <Line
+                                        type="monotone"
+                                        dataKey="temperature"
+                                        stroke="#38bdf8"
+                                        strokeWidth={2}
+                                        dot={false}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </section>
+
+                <footer className="mt-10 text-center text-slate-500 text-sm">
+                    Private Smart Home Project
+                </footer>
+
+            </div>
+        </main>
+    );
 }
