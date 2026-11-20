@@ -38,6 +38,9 @@ export default function Home() {
             const latestData = await latestRes.json();
             const historyData = await historyRes.json();
 
+            console.log("Latest sensor:", latestData);
+            console.log("History:", historyData);
+
             setLatest(latestData);
             setHistory(historyData.data ?? []);
             setStatus("Connected");
@@ -113,6 +116,10 @@ export default function Home() {
                     <h2 className="text-xl font-semibold mb-4">
                         Room Overview
                     </h2>
+                    
+                    <p className="text-xs text-slate-500 mb-4">
+                        Debug: {latest ? `Data ID ${latest.id}` : "No sensor data"}
+                    </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                         {cards.map((card) => (
